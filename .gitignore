@@ -1,0 +1,8 @@
+/target
+.idea/
+/svg_files/
+output.pdf
+output.jpg
+Bench_Cutout.pdf
+input.svg
+tester.pdf

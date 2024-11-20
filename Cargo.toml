@@ -1,0 +1,13 @@
+[package]
+name = "svg2pdf"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lopdf = "0.34.0"
+resvg = "0.44.0"
+anyhow = "1.0"
+image = "0.25.5"
+clap = { version = "4.5.21", features = ["derive"] }
+rayon = "1.10.0"
+indicatif = "0.17"
