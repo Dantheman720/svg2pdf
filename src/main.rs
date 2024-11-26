@@ -7,11 +7,10 @@ use lopdf::{
 };
 use rayon::prelude::*;
 use resvg::tiny_skia::{Color, Pixmap, Transform};
-use resvg::{self, tiny_skia, usvg};
+use resvg::{self, usvg};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::Mutex;
 use usvg::{fontdb, Options, Tree};
 
 #[derive(Parser)]
@@ -39,6 +38,8 @@ struct PageData {
 }
 
 fn main() -> Result<()> {
+
+    // TODO: Darken the stroke lines to see better.
     let args = Cli::parse();
 
     // Set up font database
