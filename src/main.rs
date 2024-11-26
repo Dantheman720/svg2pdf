@@ -1,15 +1,18 @@
-use std::sync::Arc;
-use std::path::PathBuf;
-use std::fs;
-use resvg::{self, tiny_skia, usvg};
-use usvg::{Tree, Options, fontdb};
-use resvg::tiny_skia::{Pixmap, Color};
-use anyhow::{Result, Context};
-use lopdf::{Document, Object, Stream, Dictionary, content::{Content, Operation}};
+use anyhow::{Context, Result};
 use clap::Parser;
-use rayon::prelude::*;
 use indicatif::{ProgressBar, ProgressStyle};
+use lopdf::{
+    content::{Content, Operation},
+    Dictionary, Document, Object, Stream,
+};
+use rayon::prelude::*;
+use resvg::tiny_skia::{Color, Pixmap};
+use resvg::{self, tiny_skia, usvg};
+use std::fs;
+use std::path::PathBuf;
+use std::sync::Arc;
 use std::sync::Mutex;
+use usvg::{fontdb, Options, Tree};
 
 #[derive(Parser)]
 #[command(author, version, about = "Convert directory of SVGs to PDF")]
@@ -51,7 +54,8 @@ fn main() -> Result<()> {
     let entries: Vec<_> = fs::read_dir(&args.input_dir)?
         .filter_map(|entry| entry.ok())
         .filter(|entry| {
-            entry.path()
+            entry
+                .path()
                 .extension()
                 .and_then(|ext| ext.to_str())
                 .map(|ext| ext.to_lowercase() == "svg")
@@ -68,12 +72,14 @@ fn main() -> Result<()> {
     progress_bar.set_style(
         ProgressStyle::default_bar()
             .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} {msg}")
-            .unwrap()
+            .unwrap(),
     );
 
     // Process SVGs in parallel
-    let scale = args.scale;
-    let rendered_pages: Vec<PageData> = entries.par_iter().enumerate()
+    let  scale = args.scale;
+    let rendered_pages: Vec<PageData> = entries
+        .par_iter()
+        .enumerate()
         .map(|(index, entry)| {
             let opt = Arc::clone(&opt);
             let progress_bar = Arc::clone(&progress_bar);
@@ -92,8 +98,7 @@ fn main() -> Result<()> {
             let height = (size.height() * scale) as u32;
 
             // Create pixel buffer with white background
-            let mut pixmap = Pixmap::new(width, height)
-                .context("Failed to create pixel buffer")?;
+            let mut pixmap = Pixmap::new(width, height).context("Failed to create pixel buffer")?;
 
             // Fill with white background
             let mut pixmap_mut = pixmap.as_mut();
@@ -106,13 +111,17 @@ fn main() -> Result<()> {
             resvg::render(&tree, transform, &mut pixmap_mut);
 
             // Convert pixmap to RGB data
-            let rgb_data: Vec<u8> = pixmap.data()
+            let rgb_data: Vec<u8> = pixmap
+                .data()
                 .chunks(4)
                 .flat_map(|chunk| chunk[0..3].to_vec())
                 .collect();
 
             progress_bar.inc(1);
-            progress_bar.set_message(format!("Processed {:?}", entry.path().file_name().unwrap_or_default()));
+            progress_bar.set_message(format!(
+                "Processed {:?}",
+                entry.path().file_name().unwrap_or_default()
+            ));
 
             Ok(PageData {
                 index,
@@ -149,43 +158,47 @@ fn main() -> Result<()> {
         // Create content operations
         let content_operations = vec![
             Operation::new("q", vec![]),
-            Operation::new("cm", vec![
-                Object::Real(page.width as f32),
-                Object::Real(0.0),
-                Object::Real(0.0),
-                Object::Real(page.height as f32),
-                Object::Real(0.0),
-                Object::Real(0.0),
-            ]),
+            Operation::new(
+                "cm",
+                vec![
+                    Object::Real(page.width as f32),
+                    Object::Real(0.0),
+                    Object::Real(0.0),
+                    Object::Real(page.height as f32),
+                    Object::Real(0.0),
+                    Object::Real(0.0),
+                ],
+            ),
             Operation::new("Do", vec![Object::Name("Im1".as_bytes().to_vec())]),
             Operation::new("Q", vec![]),
         ];
 
         // Create content stream
-        let content = Content { operations: content_operations };
+        let content = Content {
+            operations: content_operations,
+        };
         let content_stream = Stream::new(Dictionary::new(), content.encode().unwrap());
         let content_id = doc.add_object(Object::Stream(content_stream));
 
         // Create resources dictionary
-        let xobjects = Dictionary::from_iter(vec![
-            ("Im1", Object::Reference(image_ref))
-        ]);
+        let xobjects = Dictionary::from_iter(vec![("Im1", Object::Reference(image_ref))]);
 
-        let resources = Dictionary::from_iter(vec![
-            ("XObject", Object::Dictionary(xobjects))
-        ]);
+        let resources = Dictionary::from_iter(vec![("XObject", Object::Dictionary(xobjects))]);
         let resources_id = doc.add_object(Object::Dictionary(resources));
 
         // Create page object
         let page_dict = Dictionary::from_iter(vec![
             ("Type", Object::Name("Page".as_bytes().to_vec())),
             ("Parent", Object::Reference(pages_id)),
-            ("MediaBox", Object::Array(vec![
-                Object::Integer(0),
-                Object::Integer(0),
-                Object::Integer(page.width as i64),
-                Object::Integer(page.height as i64),
-            ])),
+            (
+                "MediaBox",
+                Object::Array(vec![
+                    Object::Integer(0),
+                    Object::Integer(0),
+                    Object::Integer(page.width as i64),
+                    Object::Integer(page.height as i64),
+                ]),
+            ),
             ("Resources", Object::Reference(resources_id)),
             ("Contents", Object::Reference(content_id)),
         ]);
