@@ -94,7 +94,7 @@ fn main() -> Result<()> {
 
             // Get size and apply scaling
             let size = tree.size();
-                let width = 960;
+            let width = 960;
             let height = 720;
 
             // Create pixel buffer with white background
@@ -248,7 +248,8 @@ fn test_scale_svg() {
     // Parse the SVG into a tree
     let mut options = Options::default();
 
-    let tree = Tree::from_data((&svg_data).as_ref(), &opt).expect("Parsing SVG failed with context");
+    let tree =
+        Tree::from_data((&svg_data).as_ref(), &opt).expect("Parsing SVG failed with context");
 
     // Define the scaling factor
     let scale_factor = 2.0;
