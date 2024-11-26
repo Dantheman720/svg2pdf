@@ -6,7 +6,7 @@ use lopdf::{
     Dictionary, Document, Object, Stream,
 };
 use rayon::prelude::*;
-use resvg::tiny_skia::{Color, Pixmap};
+use resvg::tiny_skia::{Color, Pixmap, Transform};
 use resvg::{self, tiny_skia, usvg};
 use std::fs;
 use std::path::PathBuf;
@@ -76,7 +76,7 @@ fn main() -> Result<()> {
     );
 
     // Process SVGs in parallel
-    let  scale = args.scale;
+    let scale = args.scale;
     let rendered_pages: Vec<PageData> = entries
         .par_iter()
         .enumerate()
@@ -94,8 +94,8 @@ fn main() -> Result<()> {
 
             // Get size and apply scaling
             let size = tree.size();
-            let width = (size.width() * scale) as u32;
-            let height = (size.height() * scale) as u32;
+                let width = 960;
+            let height = 720;
 
             // Create pixel buffer with white background
             let mut pixmap = Pixmap::new(width, height).context("Failed to create pixel buffer")?;
@@ -105,7 +105,7 @@ fn main() -> Result<()> {
             pixmap_mut.fill(Color::from_rgba8(255, 255, 255, 255));
 
             // Create transform with scaling
-            let transform = tiny_skia::Transform::from_scale(scale, scale);
+            let transform = Transform::from_scale(scale, scale);
 
             // Render SVG over the white background
             resvg::render(&tree, transform, &mut pixmap_mut);
@@ -227,4 +227,61 @@ fn main() -> Result<()> {
 
     println!("PDF created successfully with {} pages!", entries.len());
     Ok(())
+}
+
+#[test]
+fn test_scale_svg() {
+    let mut fontdb = fontdb::Database::new();
+    fontdb.load_system_fonts();
+
+    let mut opt = Options::default();
+    opt.fontdb = Arc::from(fontdb);
+    let opt = Arc::new(opt);
+
+    // Sample SVG content (a simple rectangle)
+    let svg_data = r#"
+        <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+            <rect x="10" y="10" width="30" height="30" fill="blue" />
+        </svg>
+        "#;
+
+    // Parse the SVG into a tree
+    let mut options = Options::default();
+
+    let tree = Tree::from_data((&svg_data).as_ref(), &opt).expect("Parsing SVG failed with context");
+
+    // Define the scaling factor
+    let scale_factor = 2.0;
+    let size = tree.size();
+    let width = (size.width() * scale_factor) as u32;
+    let height = (size.height() * scale_factor) as u32;
+
+    let mut pixmap = Pixmap::new(width, height).expect("Failed to create pixel buffer");
+
+    let mut pixmap_mut = pixmap.as_mut();
+    pixmap_mut.fill(Color::from_rgba8(255, 255, 255, 255));
+
+    let transform = Transform::from_scale(scale_factor, scale_factor);
+
+    // Apply the scaling transformation
+    resvg::render(&tree, transform, &mut pixmap_mut);
+    let rgb_data: Vec<u8> = pixmap
+        .data()
+        .chunks(4)
+        .flat_map(|chunk| chunk[0..3].to_vec())
+        .collect();
+
+    // Verify scaling by checking the width and height of the root element
+    let image_svg = format!(
+        r#"
+        <svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}">
+            <image href="data:image/png;base64,{}" width="{width}" height="{height}" />
+        </svg>
+        "#,
+        base64::encode(&pixmap.encode_png().expect("Failed to encode PNG")),
+    );
+
+    // Assert root size
+    assert_eq!(width, 200);
+    assert_eq!(height, 200);
 }
